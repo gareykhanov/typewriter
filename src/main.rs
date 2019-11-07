@@ -6,14 +6,28 @@ struct ScreenInfo {
     height: usize
 }
 
+#[derive(Debug)]
+struct ScreenLine {
+    length: usize,
+    row: usize,
+    nextLineCh: char
+}
+impl ScreenLine {
+    fn new (row: usize, length: usize, nextLineCh: char) -> ScreenLine {
+        ScreenLine{ length, row, nextLineCh }
+    }
+}
+
+
 fn main() {
     let screen_info = ScreenInfo { width: 130, height: 24 };
     let chars = read_file("test/test.txt").unwrap();
-    print(&chars, &screen_info);
-    //for c in chars.iter() {
-    //    let v = vec![c];
-    //    println!("char: {}, len: {}", c, v.len());
-    //}
+    let lines = print(&chars, &screen_info);
+    println!();
+    for l in lines.iter() { 
+        println!("{:?}", l);
+    }
+    
 }
 
 fn read_file(path: &str) -> Result<Vec<char>, String> {
@@ -21,43 +35,68 @@ fn read_file(path: &str) -> Result<Vec<char>, String> {
     Ok(file_str.chars().collect())
 }
 
-fn print(print_buf: &Vec<char>, screen_info: &ScreenInfo) {
+fn print(print_buf: &Vec<char>, screen_info: &ScreenInfo) -> Vec<ScreenLine> {
+    
+    //word
+    let mut w_i = None;
+    let mut w_len = 0;
+    //word delimeter
+    let mut del = '\0';
+    let mut del_len = 0;
+    
+    let mut line_len = 0;
 
-    let mut line = 0;
-    let mut word = String::new();
-    let mut word_len = 0;
-    for c in print_buf.iter() {
-        let c = *c;
-        if (c != '\n') && (c != ' ') {
-            word.push(c);
-            word_len += 1;
-        } else if word_len > 0 { 
-            let nl_c = c == '\n';
-            let c_len = if nl_c { 0 } else { 1 };
-            let line_with_word = word_len + line;
-            let (_line, print_c, new_line) = if line_with_word > screen_info.width {
-                (word_len + c_len, true, true)   
-            } else if line_with_word + c_len < screen_info.width {
-                (if nl_c { 0 } else { line_with_word + c_len }, true, false)
-            } else if line_with_word + c_len == screen_info.width {
-                (0, true, false)
-            } else {
-                (0, false, false)
-            };
-            
-            line = _line;
-            if new_line {
-                println!();
+    let mut lines = Vec::new();
+    let mut row = 0;
+    
+    for (i, &c) in print_buf.iter().enumerate() {
+
+        if c != '\n' && c != ' ' { 
+            if w_i == None {
+                w_i = Some(i);
             }
-            print!("{}", word); 
-            if print_c {
-                print!("{}", c);
+            w_len += 1;
+        } else {
+            if w_len > 0 {
+                let line_with_w = line_len + w_len + del_len;
+                let (on_new_line) = if del == '\n' {
+                    (true)
+                } else if line_with_w > screen_info.width {
+                    (true)
+                } else if line_with_w <= screen_info.width {
+                    (false)
+                } else {
+                    unreachable!();
+                };
+                if on_new_line {
+                    lines.push(ScreenLine::new(row, line_len, del));
+                    row += 1;
+                    line_len = w_len;
+                    print!("\n");
+                } else {
+                    line_len += w_len + del_len;
+                    if del != '\0' {
+                        print!("{}", del);
+                    }
+                }
+                for c in print_buf[w_i.unwrap()..w_i.unwrap() + w_len].iter() {
+                    print!("{}", c);
+                }
+                if i == print_buf.len() - 1 {
+                    lines.push(ScreenLine::new(row, line_len, '\0'));
+                }
+                //print!("{},{}", w_len, line_len);
+                w_i = None;
+                w_len = 0;
+                del = c;
+                del_len = if c == '\n' { 0 } else { 1 };
             }
-            word.clear();
-            word_len = 0;
-        } else if c == '\n' {
-            println!();
         }
+        
     }
+    
+    lines 
 }
+
+
 
