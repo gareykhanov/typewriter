@@ -7,28 +7,13 @@ struct ScreenInfo {
 }
 
 #[derive(Debug)]
-struct PrintedLine {
-    length: usize,
-    row: usize,
-    next_line_char: char,
+struct Line<'a> {
+    slice: &'a[char],
+    ending: char
 }
-impl PrintedLine {
-    fn new(row: usize, length: usize, next_line_char: char) -> PrintedLine {
-        PrintedLine {
-            length,
-            row,
-            next_line_char,
-        }
-    }
-}
-
-struct PrintInfo {
-    lines: Vec<PrintedLine>,
-    next_ch_i: Option<usize>
-}
-impl PrintInfo {
-    fn new(lines: Vec<PrintedLine>, next_ch_i: Option<usize>) -> Self {
-        PrintInfo{lines, next_ch_i}
+impl <'a> Line<'a> {
+    fn new(slice: &'a[char], ending: char) -> Self {
+        Line { slice, ending }
     }
 }
 
@@ -38,11 +23,18 @@ fn main() {
         height: 36,
     };
     let chars = read_file("test/test.txt").unwrap();
-    let info = print(&chars, &screen_info);
-    println!();
-    //for l in lines.iter() {
-    //    println!("{:?}", l);
-    //}
+    let lines = read_lines(&chars, 0, &screen_info);
+    let mut it = 0;
+    for l in lines.iter() {
+       // print!("$");
+        print!("{}:", it);
+        it += 1;
+        for c in l.slice.iter() {
+           // print!("{}", c);
+        }
+        //println!();
+    }
+
 }
 
 fn read_file(path: &str) -> Result<Vec<char>, String> {
@@ -50,20 +42,21 @@ fn read_file(path: &str) -> Result<Vec<char>, String> {
     Ok(file_str.chars().collect())
 }
 
-fn print(print_buf: &Vec<char>, screen_info: &ScreenInfo) -> PrintInfo {
+fn read_lines<'a>(print_buf: &'a Vec<char>, offset_ch_i: usize, screen_info: &ScreenInfo) -> Vec<Line<'a>> {
     //word
     let mut w_i = None;
     let mut w_len = 0;
     //word delimeter
     let mut del = '\0';
     let mut del_len = 0;
-
+    //line
     let mut line_len = 0;
-
     let mut lines = Vec::new();
+
     let mut row = 0;
 
-    for (i, &c) in print_buf.iter().enumerate() {
+    for (i, &c) in print_buf[offset_ch_i..].iter().enumerate() {
+        let i = i + offset_ch_i;
         if c != '\n' && c != ' ' {
             if w_i == None {
                 w_i = Some(i);
@@ -81,27 +74,39 @@ fn print(print_buf: &Vec<char>, screen_info: &ScreenInfo) -> PrintInfo {
                 unreachable!();
             };
             if on_new_line {
-                lines.push(PrintedLine::new(row, line_len, del));
+                
+               // println!(" {} {} ", row, w_len);
+                lines.push(Line::new(&print_buf[i - 1 - line_len..i], del));
+                print!("len: {}:", line_len);
+                for c in print_buf[i - 1 - line_len..i].iter() {
+                    print!("{}", c);
+                }
+                println!();
+                
                 if row == screen_info.height {
-                    return PrintInfo::new(lines, Some(i));
+                    break;
                 }
                 row += 1;
                 line_len = w_len;
-                print!("\n");
+                //print!("\n");
             } else {
                 line_len += w_len + del_len;
-                if del != '\0' {
-                    print!("{}", del);
-                }
+                //if del != '\0' {
+                //    print!("{}", del);
+                //}
             }
-            if w_len != 0 {
-                for c in print_buf[w_i.unwrap()..w_i.unwrap() + w_len].iter() {
+            //if w_len != 0 {
+            //    for c in print_buf[w_i.unwrap()..w_i.unwrap() + w_len].iter() {
+            //        print!("{}", c);
+            //    }
+            //}
+            if i == print_buf.len() - 1 {
+                lines.push(Line::new(&print_buf[i - line_len -1..i], '\0'));
+                for c in print_buf[i - 1 - line_len..i].iter() {
                     print!("{}", c);
                 }
             }
-            if i == print_buf.len() - 1 {
-                lines.push(PrintedLine::new(row, line_len, '\0'));
-            }
+            
             //print!("{},{}", w_len, line_len);
             w_i = None;
             w_len = 0;
@@ -110,5 +115,5 @@ fn print(print_buf: &Vec<char>, screen_info: &ScreenInfo) -> PrintInfo {
         }
     }
 
-    PrintInfo::new(lines, None)
+    lines
 }
